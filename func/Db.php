@@ -92,8 +92,22 @@ class Db {
         $executeDate = [];
         if (!empty($condition)) {
             foreach ($condition as $key => $value) {
-                $whereArray[] = "$value[0] $value[1] ?";
-                $executeDate[] = $value[2];
+
+                if ($value[1] === 'between') { // between
+                    $whereArray[] = "$value[0] $value[1] ? AND ?";
+                    $executeDate[] = $value[2][0];
+                    $executeDate[] = $value[2][1];
+                } elseif ($value[1] === 'in') { // in
+                    $rtrim = rtrim(str_repeat('?,', count($value[2])), ',');
+                    $whereArray[] = "$value[0] $value[1] ($rtrim)";
+                    foreach ($value[2] as $vv) {
+                        $executeDate[] = $vv;
+                    }
+                } else {
+                    // where
+                    $whereArray[] = "$value[0] $value[1] ? ";
+                    $executeDate[] = $value[2];
+                }
             }
 
             $where = implode(' AND ', $whereArray);
@@ -138,9 +152,13 @@ class Db {
     }
 }
 
+//$result = DB::table('users')->where([
+//    [ 'username', 'like', '%23%' ],
+//])->select();
+//$result = DB::table('users')->where([
+//    [ 'create_time', 'between', [ '2024-06-07 14:44:43', '2024-06-07 14:59:12' ] ],
+//])->select();
 $result = DB::table('users')->where([
-    [ 'username', '=', '123' ],
-])->where([
-
+    [ 'id', 'in', [ 1, 10 ] ],
 ])->select();
 var_dump($result);
