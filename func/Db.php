@@ -20,6 +20,7 @@ class Db {
     private static string $tableName;
     private static PDOStatementAlias $stmt;
     private static string $where = '';
+    private static array $executeDate;
 
     private function __construct($params) {
         $this->initParameter($params);
@@ -84,22 +85,62 @@ class Db {
         return self::getInstance(null);
     }
 
-    public function where(array $condition) {
+    public function where(array $condition): Db {
         $where = '';
+        // WHERE xxx
+        $whereArray = [];
+        $executeDate = [];
         if (!empty($condition)) {
+            foreach ($condition as $key => $value) {
+                $whereArray[] = "$value[0] $value[1] ?";
+                $executeDate[] = $value[2];
+            }
 
+            $where = implode(' AND ', $whereArray);
+
+            // データを整える
+            if (isset(self::$executeDate)) {
+                self::$executeDate = array_merge(self::$executeDate, $executeDate);
+            } else {
+                self::$executeDate = $executeDate;
+            }
         }
-        self::$where = $where;
+        $oldWhere = self::$where;
+        if ($where !== '') {
+            if (!str_contains($oldWhere, 'WHERE')) {
+                if ($oldWhere !== '') {
+                    $where = 'WHERE ' . $oldWhere . ' AND ' . $where;
+                } else {
+                    $where = 'WHERE ' . $where;
+                }
+
+            } else {
+                $where = $oldWhere . ' AND ' . $where;
+            }
+            self::$where = $where;
+        }
         return $this;
     }
 
     // select *
-    public function select() {
+    public function select(): bool|array {
         $sql = "SELECT * FROM " . self::$tableName . " " . self::$where;
+        echo $sql;
         self::$stmt = $this->pdo->prepare($sql);
-        self::$stmt->execute();
+        if (isset(self::$executeDate)) {
+            self::$stmt->execute(self::$executeDate);
+        } else {
+            self::$stmt->execute();
+        }
         $result = self::$stmt->fetchAll(PDO::FETCH_ASSOC);
         self::$stmt->closeCursor();
         return $result;
     }
 }
+
+$result = DB::table('users')->where([
+    [ 'username', '=', '123' ],
+])->where([
+
+])->select();
+var_dump($result);
