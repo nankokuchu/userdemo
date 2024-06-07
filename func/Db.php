@@ -49,7 +49,7 @@ class Db {
 
     private function initPDO(): void {
         try {
-            $dsn = "{$this->type}:host={$this->host};
+            $dsn = "$this->type:host=$this->host;
             port={$this->port};
             dbname={$this->dbName};
             charset={$this->charset}";
@@ -85,7 +85,7 @@ class Db {
         return self::getInstance(null);
     }
 
-    public function where(array $condition): Db {
+    public function where(array $condition, string $andOrNot = 'AND'): Db {
         $where = '';
         // WHERE xxx
         $whereArray = [];
@@ -93,11 +93,11 @@ class Db {
         if (!empty($condition)) {
             foreach ($condition as $key => $value) {
 
-                if ($value[1] === 'between') { // between
+                if (strtolower($value[1]) === 'between') { // between
                     $whereArray[] = "$value[0] $value[1] ? AND ?";
                     $executeDate[] = $value[2][0];
                     $executeDate[] = $value[2][1];
-                } elseif ($value[1] === 'in') { // in
+                } elseif (strtolower($value[1]) === 'in') { // in
                     $rtrim = rtrim(str_repeat('?,', count($value[2])), ',');
                     $whereArray[] = "$value[0] $value[1] ($rtrim)";
                     foreach ($value[2] as $vv) {
@@ -110,7 +110,18 @@ class Db {
                 }
             }
 
-            $where = implode(' AND ', $whereArray);
+            if ($andOrNot !== 'NOT' && $andOrNot !== 'ORNOT') {
+                $where = implode(" $andOrNot ", $whereArray);
+            } else {
+                //TODO
+                if ($andOrNot === 'ORNOT'){
+                    $where = implode(" OR ", $whereArray);
+                }else {
+                    $where = implode(" AND ", $whereArray);
+                }
+                $where = 'NOT(' . $where . ')';
+            }
+
 
             // データを整える
             if (isset(self::$executeDate)) {
@@ -119,21 +130,49 @@ class Db {
                 self::$executeDate = $executeDate;
             }
         }
+        $this->buildWhere($where, $andOrNot);
+        return $this;
+    }
+
+    public function whereOr(array $condition): Db {
+        return $this->where($condition, 'OR');
+    }
+
+    public function whereNot(array $condition): Db {
+        return $this->where($condition, 'NOT');
+    }
+
+    public function whereOrNot(array $condition): Db {
+        return $this->where($condition, 'ORNOT');
+    }
+
+    public function whereNull($name): Db {
+        $where = "$name is null";
+        $this->buildWhere($where);
+        return $this;
+    }
+
+    public function whereNotNull($name): Db {
+        $where = "$name is not null";
+        $this->buildWhere($where);
+        return $this;
+    }
+
+    private function buildWhere($where, string $andOrNot = 'AND'): void {
         $oldWhere = self::$where;
         if ($where !== '') {
             if (!str_contains($oldWhere, 'WHERE')) {
                 if ($oldWhere !== '') {
-                    $where = 'WHERE ' . $oldWhere . ' AND ' . $where;
+                    $where = 'WHERE ' . $oldWhere . ' ' . $andOrNot . ' ' . $where;
                 } else {
                     $where = 'WHERE ' . $where;
                 }
 
             } else {
-                $where = $oldWhere . ' AND ' . $where;
+                $where = $oldWhere . ' ' . $andOrNot . ' ' . $where;
             }
             self::$where = $where;
         }
-        return $this;
     }
 
     // select *
@@ -152,13 +191,16 @@ class Db {
     }
 }
 
-//$result = DB::table('users')->where([
-//    [ 'username', 'like', '%23%' ],
-//])->select();
+$result = DB::table('users')
+    ->where([
+        [ 'username', '=', '1' ],
+    ])
+    ->whereOr([
+        [ 'create_time', 'between', [ '2024-06-07 14:44:43', '2024-06-07 14:59:12' ] ]
+    ])
+    ->select();
 //$result = DB::table('users')->where([
 //    [ 'create_time', 'between', [ '2024-06-07 14:44:43', '2024-06-07 14:59:12' ] ],
-//])->select();
-$result = DB::table('users')->where([
-    [ 'id', 'in', [ 1, 10 ] ],
-])->select();
+//    [ 'id', 'in', [ 1, 10 ] ],
+//])->whereNull('username')->select();
 var_dump($result);
